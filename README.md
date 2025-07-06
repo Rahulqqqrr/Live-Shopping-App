@@ -1,63 +1,115 @@
-# Live-Shopping-App
+# live-chat
 
-It was originally created in order to practice subjects like **Reactive Programming, Microservices** and related Java frameworks **(Spring, Quarkus)** along with each Reactive ecosystem **(Project Reactor, Eclipse Vert.x / Netty)**
+### All responsibilities
+- Chat room of an existing live
+- Keep all messages of each live
 
-As well as frontend programming **(HTML, CSS, SASS and React with Typescript)** with **Figma design** tool.
-### Overview
-![SegmentLocal](readme_files/overview-live-shopping.png "draw.io diagram")
+### gRPC
 
-**See the README.md of each microservice** for more info.
+```
+- Client
+Get one live by slug (LiveService, FindOneBySlug)
+Validate live(slug) by password (LiveService, Validate)
+
+- Server
+Get the broadcaster's ws-session ID (ChatService, GetBroadcaster)
+Validate liveSlug (ChatService, Validate)
+```
+
+### WEBSOCKET
+*onOpen:* /chat/{slug}
+
+```
+- validate slug via gRPC, sends "slug-not-found" text if no live is found.
+- validate liveStatus via gRPC, sends "live-finished" text if LiveStatus.DONE.
+- disconnect or keep connection
+```
+
+*onMessage:* raw-text or json
+
+```
+- receives { username: string, email: string, password: string } -> JoinChat
+	- validate (live)password via gRPC **if exists**, 
+		- set current session as broadcaster and sends its sessionID, else "incorrect-password" 
+	- join the chat room of an existing live and send it's history (last 30 messages)
+
+- receives { message: string } -> MessageChat
+	- validate that the current session is joined, else "unauthorized"
+	- sends *SendChat to all sessions of current room(slug) and save in database
+
+- "finish-chat"
+	- validate that the current session is the broadcaster, else sends "unauthorized"
+	- sends "chat-finished" to all sessions of current room(slug)
+
+*SendChat(json) = {
+	username,
+	email,
+	message,
+	isBroadcaster
+}
+```
+
+### Tests
+???
+
+### Info
+- Spring Boot 3.2.5
+	- Spring Data
+		- Apache Cassandra Reactive noSQL
+    - Spring Webflux (Reactive)
+  	  - Websockets
+- gRPC (Reactive)
+	- [Reactor-gRPC (salesforce)](https://github.com/salesforce/reactive-grpc/tree/master/reactor)
+	- [gRPC Spring Boot Starter (grpc-ecosystem)](https://github.com/grpc-ecosystem/grpc-spring)
+
+
+### References
+
+[Spring Guides](https://spring.io/guides) 
+
+[Project Reactor Docs](https://projectreactor.io/docs/core/release/reference/)
+
+[ChatGPT - OpenAi](https://chat.openai.com/)
+
+[How To Build a Chat App Using WebFlux, WebSockets & React - Johan Zietsman](https://johanzietsman.com/how-to-build-a-chat-app-using-webflux-websockets-react/) - A great start point.
+
+
+
+
+## <a name="usage"></a>Usage
+The application can be run in:
 
 <details>
-<summary><i>Database entities</i></summary>
+<summary><i>Dev mode</i></summary>
 
-![SegmentLocal](readme_files/overview-relations-live-shopping.png "draw.io diagram")
-
+**1º Start the Cassandra database container**:
+```shell script
+docker compose -f cassandra-compose.yaml up -d
+```
+**2º Just run.**
+```shell script
+./mvnw compile spring-boot:run 
+```
 </details>
 
-### Usage
-The following ports should be available:
-```
-8080, 8090, 8091, 9000, 9090
-5173, 5174
-```
-**1º Package all java projects**:
-```shell script
-./package-all-java.sh
-```
-It will run _"./mvnw package -DskipTests=true"_ in each _"live-***"_ folder.
+<details>
+<summary><i>Packaged running locally (or Docker)</i></summary>
 
-**2º Just run.**
+**1º package live-chat.**
+```shell script
+./mvnw package -DskipTests=true
+```
+**1º Start the Cassandra database container**:
+```shell script
+docker compose -f cassandra-compose.yaml up -d
+```
+**3º Run the package!**
+```shell script
+java -jar ./target/live-chat-0.0.1-SNAPSHOT.jar
+```
+### on Docker
+**Afte 1º just do:**
 ```shell script
 docker compose up -d
 ```
-The total of **9 containers** will be created:
-- 3 database + 1 to config (auto exit)
-  - Cassandra database + config take a while to complete.
-- 3 backend
-  - The chat container will keep restarting until the connection with Cassandra database has stabilized.
-- 2 frontend
-
-**3º Enjoy.**
-
-Enter in manager-frontend: <br>
-http://localhost:5174
-
 </details>
-
-### Info
-- JDK 21
-  - Quarkus 3.9.3
-  - Spring Boot 3.2.5
-- Node.js 20
-  - React 18.2
-  - Typescript 5.2
-- IDEs and source-code editors
-  - Eclipse IDE 2024-03 (4.31)
-  - Spring Tool Suite 4 (4.22)
-  - VS Codium (1.87.2)
-- Other Tools
-  - Docker
-  - Insomnium 0.2.3
-- System Info
-  - MX Linux 23 (Debian 12 Bookworm)
